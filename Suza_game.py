@@ -34,9 +34,6 @@ def play_process(message, bot):
     return message, phrase, photo
 
 
-
-
-
 def checking_users(message, bot):
     robber = [message.from_user.id, message.from_user.username, message.from_user.last_name, message.from_user.first_name]
     victim = []

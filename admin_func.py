@@ -1,5 +1,3 @@
-import time
-
 from telebot import types
 import sqlite3
 import datetime
@@ -53,8 +51,6 @@ def register_new_user(bot, callback):
             keyboard.add(*buttons)
             cursor.execute(f"UPDATE {callback.message.chat.title} SET state = 'Done?' WHERE user_id = {callback.message.from_user.id}")
             con.commit()
-
-
 
 
 def check_new_user(message, msg):
