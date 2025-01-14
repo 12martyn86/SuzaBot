@@ -2,30 +2,21 @@ import sqlite3, pytz,datetime,os, random
 import time
 
 
-
-
-
 def hollidays(message, bot):
     if message.chat. id is None:
         message.chat.id = message.reply_to_message.chat. id
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-
-    # Получаем текущую дату
     current_date = datetime.datetime.now(pytz.timezone('Europe/Moscow')).strftime('%m-%d')
-
-    # Проверяем, есть ли праздник на сегодняшнюю дату в таблице
     cursor.execute('SELECT holiday FROM holidays WHERE date = ?', (current_date,))
     holiday = cursor.fetchone()
-
-    # Если праздник найден, отправляем его название
     if holiday:
         bot.send_message(message.chat.id, f"Сегодня отмечаем: {holiday[0]}", disable_notification=True)
     else:
         bot.send_message(message.chat.id, "Сегодня каких-либо особых праздников не нашлось. Но ничто ж не мешает выпить за здоровье для здоровья!ПС: неумеренное употребление алкоголя вредит вашему здоровью. ;)")
     conn.close()
 
-
+#обдумать необходимость данной функции или вывести ее в другого бота
 def UpActivity(message, bot):
     if message.chat.id is None:
         chat_id = message.reply_to_message.chat.id
@@ -88,7 +79,6 @@ def UpActivity(message, bot):
         bot.send_photo(chat_id=chat_id, photo=open(os.path.join("selfi_pics", random_photo), 'rb'), caption="селфитайм")
 
 
-
 def check_word(message): #сделать триггер на селфитайм и фоток сузы селфи
     word_list = ["вечер в хату", "утра", "доброе утро", "сиськи", "ямаха", "хонда",
                  "гараж", "оксана", "литр", "добрый вечер", "доброго вечера",
@@ -97,59 +87,3 @@ def check_word(message): #сделать триггер на селфитайм 
         if word in message.text:
             return True
     return False
-
-
-
-def forward_message_to_group(message, bot):
-    if message.text is not None:
-        text = ' '.join(message.text.split()[1:])
-        bot.send_message(-1001721689921,text)
-    elif message.caption is not None and message.photo is not None:
-        text = ' '.join(message.caption.split()[1:])
-        photo_id = message.photo[-1].file_id
-        photo_info = bot.get_file(photo_id)
-        downloaded_photo = bot.download_file(photo_info.file_path)
-        photo = downloaded_photo
-        bot.send_photo(-1001721689921,photo= photo, caption= text)
-    elif message.caption is not None and message.video is not None:
-        text = ' '.join(message.caption.split()[1:])
-        video_id = message.video.file_id
-        video_info = bot.get_file(video_id)
-        downloaded_video = bot.download_file(video_info.file_path)
-        video = downloaded_video
-        bot.send_video(-1001721689921,video= video, caption= text)
-
-
-# Переделать по-людски
-def set_reminder(message):
-    droped_text = message.text.split(" ")
-    message_date = datetime.utcfromtimestamp(message.date)
-    # Определение часового пояса
-    tz_moscow = pytz.timezone('Europe/Moscow')
-    date_moscow = message_date.replace(tzinfo=pytz.utc).astimezone(tz_moscow)
-    date = (((str(date_moscow)).split())[0]).split("-")
-    if len(droped_text) > 1:
-        desc = message.reply_to_message.text
-        date[2] = str(int(date[2]) + int(droped_text[1]))
-    else:
-        desc = message.reply_to_message.text
-        date[2] = str(int(date[2]) + 5)
-    date_to_string = f"{date[0]}" + "-" + f"{date[1]}" + "-" f"{date[2]}"
-    with sqlite3.connect("users.db") as con:
-        cursor = con.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS reminds (id INTEGER PRIMARY KEY AUTOINCREMENT, description TEXT, day INTEGER)")
-        cursor.execute(f"INSERT INTO reminds (description, day) VALUES ('{desc}', '{date_to_string}')")
-        con.commit()
-
-
-# переделать по-людски
-def checking_reminds(message):
-    message_date = datetime.utcfromtimestamp(message.date)
-    # Определение часового пояса
-    tz_moscow = pytz.timezone('Europe/Moscow')
-    message_date_moscow = message_date.replace(tzinfo=pytz.utc).astimezone(tz_moscow)
-    # Извлечение дня отправленного сообщения в часовом поясе Москвы
-    message_day_moscow = message_date_moscow.day
-    with sqlite3.connect("users.db") as con:
-        cursor = con.cursor()
-        cursor.execute(f"SELECT description FROM reminds WHERE day = {message_day_moscow}")
