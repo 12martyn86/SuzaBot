@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 from apscheduler.schedulers.background import BackgroundScheduler
 import telebot
-import random
 import functionsSuza
 from dotenv import load_dotenv
-import os
-import pytz
 from Suza_game import *
 from admin_func import *
 from funy_func import *
@@ -52,17 +49,8 @@ def take_message(message):
             functionsSuza.Help(message, bot)
         elif message.text == "!stat" or message.text == "/!stat" or "/stat" in message.text:
             functionsSuza.StatConversations(message, bot)
-        elif message.text == "!closetop":
-            functionsSuza.CloseTopic(message, bot)
-        #elif check_word(message):
-            #if random.randint(1, 20) > 10:
-                #UpActivity(message, bot)
-        elif "!напомни" in message.text:
-            functionsSuza.set_reminder(message)
         elif "!праздник" in message.text:
             hollidays(message,bot)
-
-
     if message.content_type == 'voice':
         functionsSuza.VoiceMsg(message, bot)
     if message.content_type == 'video_note':
@@ -75,19 +63,7 @@ def take_message(message):
                   "опустить", "пнуть", "поцеловать", "поцелуй", "чмок", "целовашки", "подарить", "пожертвовать", "унизить", "зачмырить",
                   "своровать", "затискать", "потискать"]
     if message.text in game_words and message.text is not None:
-        message, phrase, photo = play_process(message, bot)
-        if photo is not None:
-            bot.send_photo(chat_id=message.reply_to_message.chat.id, photo=photo, reply_to_message_id=message.reply_to_message.message_id)
-            bot.reply_to(message, text=phrase)
-        else:
-            bot.reply_to(message, text=phrase)
-    if message.text == "/test" and message.text is not None:
-        functionsSuza.tests(message, bot)
-    if message is not None and message.from_user.id == 1303933780:
-        if message.text is not None and "/forward" in message.text:
-            functionsSuza.forward_message_to_group(message, bot)
-        elif message.caption is not None and "/forward" in message.caption:
-            functionsSuza.forward_message_to_group(message, bot)
+        play_process(message, bot)
 
 
 @bot.message_handler(content_types=['new_chat_members'])
@@ -95,22 +71,15 @@ def admin(message):
      if message.chat.type == "supergroup":
         join_request(message, bot)
 
-
-# Создание планировщика задач
 scheduler = BackgroundScheduler()
 
-# Добавление задачи в планировщик
-# scheduler.add_job(functionsSuza.BirthdaySVClub, 'interval', minutes=1500, args=[bot])
 scheduler.add_job(functionsSuza.BirthdaySVClub, 'cron', hour=8, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=[bot])
 scheduler.add_job(kick_new_user, 'cron', hour=8, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=[bot])
 scheduler.add_job(functionsSuza.SaveStats, 'cron', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=['closeday'])
 scheduler.add_job(functionsSuza.SaveStats, 'cron', day_of_week='mon', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=['closeweek'])
 scheduler.add_job(functionsSuza.SaveStats, 'cron', day='1', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=['closemonth'])
 scheduler.add_job(functionsSuza.SaveStats, 'cron', day='1', month='1', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=['NewYear'])
-#scheduler.add_job(functionsSuza.Hollidays, 'cron', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=[bot])
-# scheduler.add_job(functionsSuza.checking_reminds, 'cron', hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'), args=['closeday'])
 
-# Запуск планировщика
 scheduler.start()
 
 bot.infinity_polling()
