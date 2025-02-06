@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from Suza_game import *
 from admin_func import *
 from funy_func import *
+from parts_article import  *
 
 # SV -1001721689921     Train -1001874349025 памятка для тестирования
 
@@ -74,6 +75,11 @@ def take_message(message):
             functionsSuza.StatConversations(message, bot)
         elif "!праздник" in message.text:
             hollidays(message,bot)
+        elif "/parts" in message.text:
+            text = take_message_request(message)
+            bot.reply_to(
+                message,
+                text)
     if message.content_type == 'voice':
         functionsSuza.VoiceMsg(message, bot)
     if message.content_type == 'video_note':

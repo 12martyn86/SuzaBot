@@ -6,3 +6,8 @@
 /*.mp4
 /__pycache__
 /nohup.out
+/SVdubl.db
+/users_old.db
+/users.db
+/SV.db
+/game.db
