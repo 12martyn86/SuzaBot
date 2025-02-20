@@ -1,9 +1,9 @@
 import sqlite3
 import random
+from telebot.types import  Message
 
 
-
-def play_process(message, bot):
+def play_process(message:Message , bot):
     game_words = [
         "спасибо","погладить", "почесать спинку", "спс","мой авторитет",
         "сяб", "пасибо", "пасяб", "спс", "поженимся", "чпок", "-", "+",
@@ -138,25 +138,26 @@ def checking_users(message, bot):
     return robber, victim
 
 def set_status(score):
-        if -60 < score <= -39:
-            status = "нубасик"
-        elif -40 <= score <= 19:
-            status = "Новичок на двух колесах"
-        elif -20 <= score <= 0:
-            status = "Постепенно осваивающийся"
-        elif 0 < score <= 20:
-            status = "Первосезонник"
-        elif 20 < score <= 59:
-            status = "Уверенный на дороге"
-        elif 60 <= score < 100:
-            status = "Опытный гонщик"
-        elif 100 <= score < 150:
-            status = "Мастер мотоциклизма"
-        elif 150 <= score < 200:
-            status = "Ветеран двухколесного мира"
-        elif score >= 200:
-            status = "Легенда мотоциклизма"
-        return status
+    status = ""
+    if -60 < score <= -39:
+        status += "нубасик"
+    elif -40 <= score <= 19:
+        status += "Новичок на двух колесах"
+    elif -20 <= score <= 0:
+        status += "Постепенно осваивающийся"
+    elif 0 < score <= 20:
+        status += "Первосезонник"
+    elif 20 < score <= 59:
+        status += "Уверенный на дороге"
+    elif 60 <= score < 100:
+        status += "Опытный гонщик"
+    elif 100 <= score < 150:
+        status += "Мастер мотоциклизма"
+    elif 150 <= score < 200:
+        status += "Ветеран двухколесного мира"
+    elif score >= 200:
+        status = "Легенда мотоциклизма"
+    return status
 
 def thanks_giving(robber, victim, phrase):
     if robber[0] == victim[0]:

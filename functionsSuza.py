@@ -1,4 +1,7 @@
-from telebot import types
+from time import sleep
+
+import telebot
+from telebot import TeleBot, types, util
 import datetime
 import speech_recognition
 from pydub import AudioSegment
@@ -210,7 +213,7 @@ def StatConversations(message, bot):
     bot.reply_to(message, f"{all_text}")
 
 
-def VoiceMsg(message, bot):
+def VoiceMsg(message:Message, bot:TeleBot):
     whosaid = ""
     # Получаем информацию о голосовом сообщении
     file_info = bot.get_file(message.voice.file_id)
@@ -242,14 +245,17 @@ def VideoMsg(message, bot):
     audio.write_audiofile("audio.wav")
     RecognAudio("audio.wav", bot, message)
 
-def RecognAudio(audio,bot, message):
+def RecognAudio(audio,bot:TeleBot, message:Message):
     # Распознаем речь в аудиофайле
     r = sr.Recognizer()
     with sr.AudioFile(audio) as source:
         audio_data = r.record(source)
         try:
-            text = r.recognize_google(audio_data, language='ru')
-            bot.reply_to(message, text)
+            text = r.recognize_google(audio_data, language='ru')  # выдает не весь текст, проверить
+            lines = telebot.util.smart_split(text, chars_per_string= 3000)
+            for line in lines:
+                bot.reply_to(message, line)
+                sleep(20)
         except speech_recognition.exceptions.UnknownValueError:
             bot.reply_to(message, "Бурчит себе чего-то под нос, "
                                   "ни фига непонятно. Говори четче")

@@ -6,13 +6,20 @@ from Suza_game import *
 from admin_func import *
 from funy_func import *
 from parts_article import  *
+from telebot import *
+import traceback
 
 # SV -1001721689921     Train -1001874349025 памятка для тестирования
+class ExceptionHandler:
+    def handle(self, exception_info):
+        print(f"Произошла ошибка: {exception_info}")
 
+# Создаем экземпляр ExceptionHandler
+exception_handler = ExceptionHandler()
 
 load_dotenv()  # Загрузка значений из файла .env в переменные окружения
 TOKEN = os.getenv("TOKEN")
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, exception_handler=exception_handler)
 states = ["Isbot?", "What_region?", "What_bike?", "What_birthday?"]
 
 @bot.callback_query_handler(func=lambda callback: callback.data)

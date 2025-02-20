@@ -1,11 +1,12 @@
 import telebot
-from telebot import  types
+from telebot import types
+from telebot.types import *
 import sqlite3
 import  re
 
 
-path = r"C:\Users\Serg\PycharmProjects\Parser\.venv\Suzuki.db"
-def take_message_request(message):
+path = "Suzuki.db"
+def take_message_request(message:Message):
     years = list(range(1999, 2018))
     capacity = ""
     year_bike = ""
