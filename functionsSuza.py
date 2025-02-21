@@ -1,5 +1,8 @@
+import os.path
+import sqlite3
+from importlib.resources import contents
 from time import sleep
-
+import json
 import telebot
 from telebot import TeleBot, types, util
 import datetime
@@ -99,119 +102,115 @@ def Help(message, bot):
             "присваиваю шутейные 'звания'. Вызвать статистику за день можно "
             "написав /stat или !stat. Помощь тут - /help")
 
-def Statistics(message):
-    name_table = "statsmsg" + str(abs(message.chat.id))
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        f"SELECT name FROM sqlite_master WHERE type='table' "
-        f"AND name='{name_table}'")
-    existing_table = cursor.fetchone()
-    if not existing_table:
-        cursor.execute(
-            f"CREATE TABLE {name_table} "
-            f"(user_id INTEGER NOT NULL, username TEXT, lastname TEXT, "
-            f"firstname TEXT, daystats INTEGER, weekstats INTEGER, "
-            f"monthstats INTEGER, yearstats INTEGER, mute TEXT, "
-            f"PRIMARY KEY(user_id))")
-        conn.commit()
-    cursor.execute(
-        f"SELECT * FROM {name_table} WHERE user_id=?",
-        (message.from_user.id,))
-    user_data = cursor.fetchone()
-    if user_data is None:
-        # Если пользователь не существует, добавляем его в базу данных
-        cursor.execute(
-            f"INSERT INTO {name_table} "
-            f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (message.from_user.id, message.from_user.username,
-             message.from_user.last_name, message.from_user.first_name,
-             1,0,0,0, 'True'))
-        conn.commit()
+def writing_statistics(message: Message):
+    """
+    Функция для записи количества сообщений отправленных пользователем
+    в группу или бота.
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+
+    :return: None
+    """
+    content_type = message.content_type
+    chat_id = str(message.chat.id)
+    chat_title = message.chat.title
+    user_id = str(message.from_user.id)
+    if content_type in ['text', 'animation', 'audio',
+                        'document', 'photo', 'sticker',
+                        'video', 'video_note', 'voice']:
+        with sqlite3.connect('users.db') as con:
+            cursor = con.cursor()
+            cursor.execute(f'''CREATE TABLE 
+                            IF NOT EXISTS "{chat_id}" 
+                            ("chat_title"	TEXT,
+                            "user_id"	TEXT NOT NULL UNIQUE,
+                            "text"	INTEGER NOT NULL DEFAULT 0,
+                            "animation"	INTEGER NOT NULL DEFAULT 0,
+                            "audio"	INTEGER NOT NULL DEFAULT 0,
+                            "document"	INTEGER NOT NULL DEFAULT 0,
+                            "photo"	INTEGER NOT NULL DEFAULT 0,
+                            "sticker"	INTEGER NOT NULL DEFAULT 0,
+                            "video"	INTEGER NOT NULL DEFAULT 0,
+                            "video_note"	INTEGER NOT NULL DEFAULT 0,
+                            "voice"	INTEGER NOT NULL DEFAULT 0,
+                            "reputation"	INTEGER NOT NULL DEFAULT 0)''')
+            con.commit()
+            cursor.execute(f'''SELECT user_id FROM "{chat_id}" 
+                                WHERE user_id=?''',(user_id,))
+            if cursor.fetchone() is None:
+                cursor.execute(f'''INSERT INTO "{chat_id}" 
+                                    (chat_title, user_id, text, animation, 
+                                    audio, document, photo, sticker, video, 
+                                    video_note, voice, reputation) VALUES 
+                                    (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?)''',
+                        (chat_title, user_id, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0))
+            con.commit()
+            cursor.execute(f'''SELECT {content_type} FROM "{chat_id}" 
+                                    WHERE user_id=?''', (user_id,))
+            result = list(cursor.fetchone())
+            result[0] += 1
+            cursor.execute(f'''UPDATE "{chat_id}" SET {content_type} = ?
+                             WHERE user_id = ?''', (result[0], user_id))
+            con.commit()
+
+def check_command(message: Message, bot: TeleBot):
+    if message.text.lower() == "/start":
+        pass
+    elif message.text.lower() == "/help":
+        pass
+    elif message.text.lower() == "/stat":
+        check_statistic(message, bot)
+
+def check_statistic(message: Message, bot: TeleBot):
+    '''
+    Обрабатывает запрос на показ статистики пользователя в данном чате
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+
+    :return: None
+    '''
+
+    user_id = None
+    user_lastname = None
+    username = None
+    user_firstname = None
+    chat_id = str(message.chat.id)
+    if message.reply_to_message is None:
+        user_id = str(message.from_user.id)
+        user_lastname = message.from_user.last_name
+        username = message.from_user.username
+        user_firstname = message.from_user.first_name
     else:
-        user_data = list(user_data)
-        user_data[4]+=1
-        cursor.execute(
-            f"UPDATE {name_table} SET username=?, lastname=?, "
-            f"firstname=?, daystats=?, weekstats=?, monthstats=?, yearstats=? "
-            f"WHERE user_id=?",(message.from_user.username,
-                                message.from_user.last_name,
-                                message.from_user.first_name,
-                                user_data[4], user_data[5],
-                                user_data[6], user_data[7],
-                                message.from_user.id))
-        conn.commit()
-
-def SaveStats(flag):
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-
-    # Получаем список всех таблиц, у которых в названии есть "statsmsg"
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' "
-                   "AND name LIKE 'statsmsg%'")
-    table_names = cursor.fetchall()
-
-    for table_name in table_names:
-        # Получаем все строки из текущей таблицы
-        cursor.execute(f"SELECT * FROM {table_name[0]}")
-        rows = cursor.fetchall()
-
-        for row in rows:
-            user = list(row)
-            if flag == "closeday":
-                user[5] += user[4]
-                user[4] = 0
-            elif flag == "closeweek":
-                user[6] = user[6] + user[5] + user[4]
-                user[5] = 0
-                user[4] = 0
-            elif flag == "closemonth":
-                user[7] = user[7] + user[6] + user[5] + user[4]
-                user[5] = 0
-                user[4] = 0
-            elif flag == "NewYear":
-                user[7] = 0
-                user[5] = 0
-                user[4] = 0
-            cursor.execute(f"UPDATE {table_name[0]} SET username=?, "
-                           f"lastname=?, firstname=?, daystats=?, "
-                           f"weekstats=?, monthstats=?, yearstats=? "
-                           f"WHERE user_id=?", (user[1], user[2],
-                                                user[3], user[4], user[5],
-                                                user[6], user[7], user[0]))
-            conn.commit()
-    # Фиксировать изменения и закрыть соединение
-    conn.commit()
-    conn.close()
-
-def StatConversations(message, bot):
-    name_table = "statsmsg" + str(abs(message.chat.id))
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    # Выполнение SQL-запроса
-    cursor.execute(f"SELECT user_id,daystats FROM {name_table} "
-                   f"ORDER BY daystats DESC")
-    masive = cursor.fetchall()
-    half = len(masive) // 2
-    first_half = masive[:half]
-    second_half = masive[half:]
-    result = [first_half[0][0], first_half[-1][0], second_half[-1][0]]
-    cursor.execute(f"SELECT user_id,username,lastname,firstname,daystats "
-                   f"FROM {name_table} WHERE user_id IN ({result[0]}, "
-                   f"{result[1]}, {result[2]})")
-    result = list(cursor.fetchall())
-    result.sort(key=lambda x: x[-1], reverse=True)
-    pizdabol_text = (f"Итак сейчас у нас:\n\nНеостановимый пиздабол:"
-                     f"\n@{result[0][1]}/{result[0][0]}/{result[0][2]} "
-                     f"{result[0][3]}")
-    boltun_text = (f"\nПериодический подпездыватель:\n@{result[1][1]}/"
-                   f"{result[1][0]}/{result[1][2]} {result[1][3]}")
-    tihonya_text = (f"\nПодозрительный тихушник:\n@{result[2][1]}/"
-                    f"{result[2][0]}/{result[2][2]} {result[2][3]}")
-    all_text = f"{pizdabol_text}\n{boltun_text}\n{tihonya_text}"
-    conn.close()
-    bot.reply_to(message, f"{all_text}")
-
+        user_id = str(message.reply_to_message.from_user.id)
+        user_lastname = message.reply_to_message.from_user.last_name
+        username = message.reply_to_message.from_user.username
+        user_firstname = message.reply_to_message.from_user.first_name
+    with sqlite3.connect('users.db') as con:
+        cursor = con.cursor()
+        cursor.execute(f'''SELECT * FROM "{chat_id}" WHERE user_id = ? ''',
+                       (user_id,))
+        result = cursor.fetchall()
+        text = f'''Фамилия: {user_lastname}\n
+                   Имя: {user_firstname}\n
+                   Юзернейм: {username}\n
+                   отправил:\n
+                   текстовых - {result[0][2]}\n,
+                   анимаций - {result[0][3]}\n,
+                   аудио - {result[0][4]}\n,
+                   документов - {result[0][5]}\n,
+                   фото - {result[0][6]}\n,
+                   стикеров - {result[0][7]}\n,
+                   видео - {result[0][8]}\n,
+                   видеокружков - {result[0][9]}\n,
+                   голосовых - {result[0][10]}\n,
+                   репутация - {result[0][11]}\n
+                   '''
+        pic = None
+        member = bot.get_user_profile_photos(int(user_id),1,1)
+        print() # получить фото пользователя
 
 def VoiceMsg(message:Message, bot:TeleBot):
     whosaid = ""
