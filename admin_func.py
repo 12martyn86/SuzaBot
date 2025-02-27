@@ -1,103 +1,253 @@
-from telebot import types
+from telebot import types, util, TeleBot
+import telebot
 import sqlite3
 import datetime
-
-def join_request(message, bot):
-    current_time = int((datetime.datetime.now() + datetime.timedelta(minutes=3)).timestamp())
-    bot.restrict_chat_member(message.chat.id, message.from_user.id, until_date=current_time, can_send_messages=False, can_send_media_messages=False, can_send_polls=False, can_send_other_messages=False, can_add_web_page_previews=False, can_change_info=False, can_invite_users=False, can_pin_messages=False)
-    with sqlite3.connect("users.db") as con:
-        cursor = con.cursor()
-        cursor.execute(f"SELECT status FROM {message.chat.title} where user_id ==  {message.from_user.id}")
-        result = cursor.fetchone()
-        if result is None or result[0] != "Done":
-            #keyb_new_user = types.InlineKeyboardMarkup(row_width=3)
-            #btn_new_user = types.InlineKeyboardButton(text="Жми, если не бот.", callback_data=f"newuser?")
-            #keyb_new_user.add(btn_new_user)
-            cursor.execute(f"INSERT OR REPLACE INTO {message.chat.title} (user_id, username, lastname, firstname, daystats, weekstats, monthstats, yearstats, status) VALUES ({message.from_user.id}, '{message.from_user.username}', '{message.from_user.last_name}', '{message.from_user.first_name}', 0, 0, 0, 0, 'new_user {current_time}')")
-            con.commit()
-            bot.reply_to(message, "Если ты не бот, и хочешь быть участником этой группы - напиши мне в личку и пройди анкетирование в течении 3 минут.")
-        elif result[0] == "Done":
-            bot.reply_to(message, "С возвращением!")
-            cursor.execute(f"INSERT OR REPLACE INTO {message.chat.title} (username, lastname, firstname) VALUES ('{message.from_user.username}', '{message.from_user.last_name}', '{message.from_user.first_name}')")
-            bot.restrict_chat_member(message.chat.id, message.from_user.id,  can_send_messages=True, can_send_media_messages=True, can_send_polls=True, can_send_other_messages=True, can_add_web_page_previews=True, can_change_info=True, can_invite_users=True, can_pin_messages=True)
-
-def register_new_user(bot, callback):
-    with sqlite3.connect("users.db") as con:
-        cursor = con.cursor()
-        if callback.data == "newuser":
-            keyboard = types.InlineKeyboardMarkup()
-            buttons = [types.InlineKeyboardButton(city, callback_data="newuser What_region? " + city.lower()) for city in ['Москва', 'Спб', 'Тверь', 'Новгород']]
-            keyboard.add(*buttons)
-            cursor.execute(f"UPDATE {callback.message.chat.title} SET state = 'What_region?'  WHERE user_id = {callback.message.from_user.id}")
-            bot.reply_to(callback.message, "Из какой ты области?", reply_markup = keyboard)
-            con.commit()
-        elif "newuser What_region?" in callback.data:
-            keyboard = types.InlineKeyboardMarkup()
-            buttons = [types.InlineKeyboardButton(bike, callback_data="newuser What_bike? " + bike.lower()) for bike in ['SV400', 'SV650', 'SV1000', 'SFV']]
-            keyboard.add(*buttons)
-            cursor.execute(f"UPDATE {callback.message.chat.title} SET state = 'What_bike?' WHERE user_id = {callback.message.from_user.id}")
-            bot.reply_to(callback.message, "Какой у тебя байк??", reply_markup=keyboard)
-            con.commit()
-        elif "newuser What_bike?" in callback.data:
-            keyboard = types.InlineKeyboardMarkup()
-            buttons = [types.InlineKeyboardButton(birthday, callback_data="newuser What_birthday? " + birthday) for birthday in range(1,32)]
-            keyboard.add(*buttons)
-            cursor.execute(f"UPDATE {callback.message.chat.title} SET state = 'What_birthday?' WHERE user_id = {callback.message.from_user.id}")
-            bot.reply_to(callback.message, "Какого числа ты родился?", reply_markup=keyboard)
-            con.commit()
-        elif callback.data == "newuser What_birthday?":
-            keyboard = types.InlineKeyboardMarkup()
-            buttons = [types.InlineKeyboardButton(birthday, callback_data="newuser What_birthday? " + birthday) for birthday in range(1,13)]
-            keyboard.add(*buttons)
-            cursor.execute(f"UPDATE {callback.message.chat.title} SET state = 'Done?' WHERE user_id = {callback.message.from_user.id}")
-            con.commit()
+from telebot.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 
-def check_new_user(message, msg):
-    with sqlite3.connect("users.db") as con:
-        name_table = "statsmsg" + str(abs(message.chat.id))
-        cursor = con.cursor()
-        cursor.execute(f"SELECT * FROM {name_table} WHERE user_id == {message.from_user.id}")
-        result = cursor.fetchone()
-        if result is None:
-            cursor.execute(f"INSERT INTO {name_table} (user_id, username, lastname, firstname, daystats, weekstats, monthstats, yearstats, mute) VALUES ({message.from_user.id}, '{message.from_user.username}', '{message.from_user.last_name}', '{message.from_user.first_name}', 0, 0, 0, 0, 'True {msg.chat.id} {msg.id}')")
-            con.commit()
-        else:
-            cursor.execute(f"UPDATE {name_table} SET username = '{message.from_user.username}', lastname = '{message.from_user.last_name}', firstname = '{message.from_user.first_name}', mute = 'True {msg.chat.id} {msg.id}' WHERE user_id = {message.from_user.id}")
-            con.commit()
+def writing_statistics(message: Message):
+    """
+    Функция для записи количества сообщений отправленных пользователем
+    в группу или бота.
 
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
 
-def kick_new_user(bot):
-    with sqlite3.connect("users.db") as con:
-        cursor = con.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'statsmsg%'")
-        tables = cursor.fetchall()
-        for table in tables:
-            cursor.execute(f"SELECT * FROM {table[0]} WHERE mute LIKE 'True%'")
-            result = cursor.fetchall()
-            for res in result:
-                res_msg = res[8].split()
-                if res_msg[0] == "True":
-                    chat_id = "-" + table[0][8:]
-                    user_id = res[0]
-                    bot.unban_chat_member(chat_id,user_id)
-                    bot.delete_message(res_msg[1],res_msg[2])
-                    cursor.execute(f"DELETE FROM {table[0]} WHERE user_id = {user_id}")
-                    con.commit()
-                    bot.send_message(chat_id, "Ой, кажется кто-то вылетел из чата...\n(не люблю конкурентов\U0001F608)")
-
-def allow_request(bot, callback):
-    callback.data = int(callback.data.split()[1])
-    if callback.from_user.id != callback.data:
-        bot.send_message(callback.message.chat.id, "Это не тебе")
-    else:
-        bot.restrict_chat_member(callback.message.chat.id, callback.from_user.id, can_send_messages=True, can_send_media_messages = True, can_send_polls = True, can_send_other_messages = True, can_add_web_page_previews = True, can_change_info = False, can_invite_users = True, can_pin_messages = False)
-        with sqlite3.connect("users.db") as con:
-            name_table = "statsmsg" + str(abs(callback.message.chat.id))
+    :return: None
+    """
+    content_type = message.content_type
+    chat_id = str(message.chat.id)
+    chat_title = message.chat.title
+    user_id = str(message.from_user.id)
+    if content_type in ['text', 'animation', 'audio',
+                        'document', 'photo', 'sticker',
+                        'video', 'video_note', 'voice']:
+        with sqlite3.connect('users.db') as con:
             cursor = con.cursor()
-            cursor.execute(f"SELECT mute FROM {name_table} WHERE user_id = {callback.from_user.id}")
-            result = list(cursor.fetchone())
-            res_msg = result[0].split()
-            bot.delete_message(res_msg[1],res_msg[2])
-            cursor.execute(f"UPDATE {name_table} SET username = '{callback.from_user.username}', lastname = '{callback.from_user.last_name}', firstname = '{callback.from_user.first_name}', mute = 'False' WHERE user_id = {callback.from_user.id}")
+            cursor.execute(f'''CREATE TABLE 
+                            IF NOT EXISTS "{chat_id}" 
+                            ("chat_title"	TEXT,
+                            "user_id"	TEXT NOT NULL UNIQUE,
+                            "text"	INTEGER NOT NULL DEFAULT 0,
+                            "animation"	INTEGER NOT NULL DEFAULT 0,
+                            "audio"	INTEGER NOT NULL DEFAULT 0,
+                            "document"	INTEGER NOT NULL DEFAULT 0,
+                            "photo"	INTEGER NOT NULL DEFAULT 0,
+                            "sticker"	INTEGER NOT NULL DEFAULT 0,
+                            "video"	INTEGER NOT NULL DEFAULT 0,
+                            "video_note"	INTEGER NOT NULL DEFAULT 0,
+                            "voice"	INTEGER NOT NULL DEFAULT 0,
+                            "reputation"	INTEGER NOT NULL DEFAULT 0)''')
             con.commit()
+            cursor.execute(f'''SELECT user_id FROM "{chat_id}" 
+                                WHERE user_id=?''',(user_id,))
+            if cursor.fetchone() is None:
+                cursor.execute(f'''INSERT INTO "{chat_id}" 
+                                    (chat_title, user_id, text, animation, 
+                                    audio, document, photo, sticker, video, 
+                                    video_note, voice, reputation) VALUES 
+                                    (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?)''',
+                        (chat_title, user_id, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0))
+            con.commit()
+            cursor.execute(f'''SELECT {content_type} FROM "{chat_id}" 
+                                    WHERE user_id=?''', (user_id,))
+            result = list(cursor.fetchone())
+            result[0] += 1
+            cursor.execute(f'''UPDATE "{chat_id}" SET {content_type} = ?
+                             WHERE user_id = ?''', (result[0], user_id))
+            con.commit()
+
+
+def check_statistic(message: Message, bot: TeleBot):
+    '''
+    Обрабатывает запрос на показ статистики пользователя в данном чате
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+    :param bot: Telebot
+    :return: None
+    '''
+
+    user_id = None
+    user_lastname = None
+    username = None
+    user_firstname = None
+    chat_id = str(message.chat.id)
+    thread_id = None
+    text = ""
+    if message.reply_to_message is None:
+        user_id = str(message.from_user.id)
+        user_lastname = message.from_user.last_name
+        username = message.from_user.username
+        user_firstname = message.from_user.first_name
+    else:
+        user_id = str(message.reply_to_message.from_user.id)
+        user_lastname = message.reply_to_message.from_user.last_name
+        username = message.reply_to_message.from_user.username
+        user_firstname = message.reply_to_message.from_user.first_name
+    with sqlite3.connect('users.db') as con:
+        cursor = con.cursor()
+        cursor.execute(f'''SELECT * FROM "{chat_id}" WHERE user_id = ? ''',
+                       (user_id,))
+        result = cursor.fetchall()
+        if result is not None and result != []:
+            text +=  (f"Фамилия: {user_lastname}\n"
+                     f"Имя: {user_firstname}\n"
+                     f"Юзернейм: {username}\n"
+                     f"отправил:\n"
+                     f"текстовых - {result[0][2]},\n"
+                     f"анимаций - {result[0][3]},\n"
+                     f"аудио - {result[0][4]},\n"
+                     f"документов - {result[0][5]},\n"
+                     f"фото - {result[0][6]},\n"
+                     f"стикеров - {result[0][7]},\n"
+                     f"видео - {result[0][8]},\n"
+                     f"видеокружков - {result[0][9]},\n"
+                     f"голосовых - {result[0][10]},\n"
+                     f"репутация - {result[0][11]}\n")
+        user_photos = bot.get_user_profile_photos(int(user_id),1,1).photos
+        if message.chat.is_forum:
+            thread_id=message.message_thread_id
+        if user_photos != [] and not message.from_user.is_bot:
+            profile_pic_id = user_photos[0][0].file_id
+            bot.send_photo(int(chat_id),
+                           photo=profile_pic_id,
+                           caption=text,
+                           reply_to_message_id=message.message_id,
+                           message_thread_id=thread_id)
+        elif message.reply_to_message.from_user.is_bot:
+            bot.send_message(int(chat_id),
+                             "Похоже это бот. Но это неточно.",
+                             reply_to_message_id=message.message_id,
+                             message_thread_id=thread_id)
+        else:
+            bot.send_message(int(chat_id),
+                             text=text, reply_to_message_id=message.id,
+                             message_thread_id=message.message_thread_id)
+
+
+def join_request(message: Message, bot: TeleBot):
+    '''
+    Обрабатывает вступление нового пользователя в группу и ограничивает права нового участника.
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+    :param bot: Telebot
+    :return: None
+    '''
+
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    username = message.from_user.username
+    lastname = message.from_user.last_name
+    firstname = message.from_user.first_name
+    with sqlite3.connect('users.db') as con:
+        cursor = con.cursor()
+        cursor.execute(f'''CREATE TABLE IF NOT EXISTS "{str(chat_id)}"("chat_title"	TEXT,
+                            "user_id"	TEXT NOT NULL UNIQUE,
+                            "text"	INTEGER NOT NULL DEFAULT 0,
+                            "animation"	INTEGER NOT NULL DEFAULT 0,
+                            "audio"	INTEGER NOT NULL DEFAULT 0,
+                            "document"	INTEGER NOT NULL DEFAULT 0,
+                            "photo"	INTEGER NOT NULL DEFAULT 0,
+                            "sticker"	INTEGER NOT NULL DEFAULT 0,
+                            "video"	INTEGER NOT NULL DEFAULT 0,
+                            "video_note"	INTEGER NOT NULL DEFAULT 0,
+                            "voice"	INTEGER NOT NULL DEFAULT 0,
+                            "reputation"	INTEGER NOT NULL DEFAULT 0)''')
+        con.commit()
+        cursor.execute(f'''SELECT user_id FROM "{str(chat_id)}"''')
+        result = cursor.fetchall()
+        if result != []:
+            if str(user_id) in result:
+                bot.reply_to(message, "Рада вас снова приветствовать в чате! С возвращением!")
+            else:
+                bot.restrict_chat_member(chat_id, user_id, can_send_messages=None,
+                         can_send_media_messages=None,
+                         can_send_polls=None,
+                         can_send_other_messages=None,
+                         can_change_info=None,
+                         can_invite_users=None,
+                         can_pin_messages=None)
+                keyb = InlineKeyboardMarkup()
+                btn = InlineKeyboardButton('Нажми', callback_data=f'new_join_request {str(user_id)}')
+                keyb.add(btn)
+                for name in [firstname, username, lastname]:
+                    if name is not None and name.strip() != "":
+                        bot.reply_to(message,
+                                     f"Привет {name}.\nЕсли ты не бот нажми на кнопку ниже в течение 3 минут.",
+                                     reply_markup=keyb)
+                        break
+                    else:
+                        bot.reply_to(message,
+                                     "Привет.\nЕсли ты не бот нажми на кнопку ниже в течение 3 минут.",
+                                     reply_markup=keyb)
+    unverifed_user  = [f'{user_id}',f'{datetime.datetime.now()}',f'{chat_id}']
+    with open('unverifed_users.txt', 'a', encoding='utf-8', ) as file:
+        file.write('#'.join(unverifed_user) + '\n')
+
+
+def kick_unverifed_user(bot: TeleBot):
+    '''
+    Проверяет есть ли в файле запись с пользователем, если запись есть - снимает ограничения
+    спользователя и удаляет его из группы.
+
+    :param bot: Telebot
+    :return: None
+    '''
+    now = datetime.datetime.now()
+    new_data = []
+    with open("unverifed_users.txt", 'r', encoding='utf-8') as file:
+        data = file.readlines()
+        for line in data:
+            if line != '\n':
+                    info = line.split('#')
+                    user_id = int(info[0])
+                    user_time = datetime.datetime.strptime(info[1], '%Y-%m-%d %H:%M:%S.%f')
+                    chat_id = int(info[2])
+                    if user_time + datetime.timedelta(seconds=180) <= now:
+                        bot.restrict_chat_member(chat_id, user_id, can_send_messages=True,
+                                                 can_send_media_messages=True,
+                                                 can_send_polls=True,
+                                                 can_send_other_messages=True,
+                                                 can_change_info=True,
+                                                 can_invite_users=True,
+                                                 can_pin_messages=True)
+                        bot.unban_chat_member(chat_id, user_id)
+                    else:
+                        new_data.append(line)
+    with open('unverifed_users.txt', 'w', encoding='utf-8', ) as file:
+        for line in new_data:
+            file.write(line + '\n')
+
+
+def allow_request_new_member(user_id: int, chat_id: int, bot: TeleBot, ):
+    '''
+    Обрабатывает нажатие пользователем кнопки подтверждающей, что пользователь не бот.
+
+    :param user_id: int
+    :param chat_id: int
+    :param bot: TeleBot
+
+    :return: None
+    '''
+    with open("unverifed_users.txt", 'r', encoding='utf-8') as file:
+        data = file.readlines()
+        new_data = []
+        for line in data:
+            if line != '\n' and str(user_id) not in line:
+                new_data.append(line)
+            else:
+                bot.restrict_chat_member(chat_id, user_id, can_send_messages=True,
+                                         can_send_media_messages=True,
+                                         can_send_polls=True,
+                                         can_send_other_messages=True,
+                                         can_change_info=True,
+                                         can_invite_users=True,
+                                         can_pin_messages=True)
+    with open("unverifed_users.txt", 'w', encoding='utf-8') as file:
+        for line in new_data:
+            file.write(line + '\n')
+
+

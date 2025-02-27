@@ -1,0 +1,7 @@
+pyTelegramBotAPI~=4.26.0
+APScheduler~=3.11.0
+python-dotenv~=1.0.1
+pytz~=2025.1
+SpeechRecognition~=3.14.1
+pydub~=0.25.1
+moviepy~=1.0.3

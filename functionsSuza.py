@@ -2,7 +2,6 @@ import os.path
 import sqlite3
 from importlib.resources import contents
 from time import sleep
-import json
 import telebot
 from telebot import TeleBot, types, util
 import datetime
@@ -12,11 +11,12 @@ import speech_recognition as sr
 from moviepy.editor import VideoFileClip
 import pytz
 from datetime import datetime
+
+import admin_func
 from Suza_game import *
 
 
 # SV -1001721689921 train -1001874349025
-
 
 def GetOwner(message, bot):
     admins = bot.get_chat_administrators(message.chat.id)
@@ -102,58 +102,7 @@ def Help(message, bot):
             "присваиваю шутейные 'звания'. Вызвать статистику за день можно "
             "написав /stat или !stat. Помощь тут - /help")
 
-def writing_statistics(message: Message):
-    """
-    Функция для записи количества сообщений отправленных пользователем
-    в группу или бота.
 
-    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
-    :type message: :class:`telebot.types.Message`
-
-    :return: None
-    """
-    content_type = message.content_type
-    chat_id = str(message.chat.id)
-    chat_title = message.chat.title
-    user_id = str(message.from_user.id)
-    if content_type in ['text', 'animation', 'audio',
-                        'document', 'photo', 'sticker',
-                        'video', 'video_note', 'voice']:
-        with sqlite3.connect('users.db') as con:
-            cursor = con.cursor()
-            cursor.execute(f'''CREATE TABLE 
-                            IF NOT EXISTS "{chat_id}" 
-                            ("chat_title"	TEXT,
-                            "user_id"	TEXT NOT NULL UNIQUE,
-                            "text"	INTEGER NOT NULL DEFAULT 0,
-                            "animation"	INTEGER NOT NULL DEFAULT 0,
-                            "audio"	INTEGER NOT NULL DEFAULT 0,
-                            "document"	INTEGER NOT NULL DEFAULT 0,
-                            "photo"	INTEGER NOT NULL DEFAULT 0,
-                            "sticker"	INTEGER NOT NULL DEFAULT 0,
-                            "video"	INTEGER NOT NULL DEFAULT 0,
-                            "video_note"	INTEGER NOT NULL DEFAULT 0,
-                            "voice"	INTEGER NOT NULL DEFAULT 0,
-                            "reputation"	INTEGER NOT NULL DEFAULT 0)''')
-            con.commit()
-            cursor.execute(f'''SELECT user_id FROM "{chat_id}" 
-                                WHERE user_id=?''',(user_id,))
-            if cursor.fetchone() is None:
-                cursor.execute(f'''INSERT INTO "{chat_id}" 
-                                    (chat_title, user_id, text, animation, 
-                                    audio, document, photo, sticker, video, 
-                                    video_note, voice, reputation) VALUES 
-                                    (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?)''',
-                        (chat_title, user_id, 0, 0, 0, 0, 0, 0,
-                                    0, 0, 0, 0))
-            con.commit()
-            cursor.execute(f'''SELECT {content_type} FROM "{chat_id}" 
-                                    WHERE user_id=?''', (user_id,))
-            result = list(cursor.fetchone())
-            result[0] += 1
-            cursor.execute(f'''UPDATE "{chat_id}" SET {content_type} = ?
-                             WHERE user_id = ?''', (result[0], user_id))
-            con.commit()
 
 def check_command(message: Message, bot: TeleBot):
     if message.text.lower() == "/start":
@@ -161,56 +110,13 @@ def check_command(message: Message, bot: TeleBot):
     elif message.text.lower() == "/help":
         pass
     elif message.text.lower() == "/stat":
-        check_statistic(message, bot)
+        if message.chat.type == 'supergroup' or  message.chat.type == 'private':
+            admin_func.check_statistic(message, bot)
+    elif message.text.lower() == '/kick':
+        pass
+    elif message.text.lower() == '/mute':
+        pass
 
-def check_statistic(message: Message, bot: TeleBot):
-    '''
-    Обрабатывает запрос на показ статистики пользователя в данном чате
-
-    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
-    :type message: :class:`telebot.types.Message`
-
-    :return: None
-    '''
-
-    user_id = None
-    user_lastname = None
-    username = None
-    user_firstname = None
-    chat_id = str(message.chat.id)
-    if message.reply_to_message is None:
-        user_id = str(message.from_user.id)
-        user_lastname = message.from_user.last_name
-        username = message.from_user.username
-        user_firstname = message.from_user.first_name
-    else:
-        user_id = str(message.reply_to_message.from_user.id)
-        user_lastname = message.reply_to_message.from_user.last_name
-        username = message.reply_to_message.from_user.username
-        user_firstname = message.reply_to_message.from_user.first_name
-    with sqlite3.connect('users.db') as con:
-        cursor = con.cursor()
-        cursor.execute(f'''SELECT * FROM "{chat_id}" WHERE user_id = ? ''',
-                       (user_id,))
-        result = cursor.fetchall()
-        text = f'''Фамилия: {user_lastname}\n
-                   Имя: {user_firstname}\n
-                   Юзернейм: {username}\n
-                   отправил:\n
-                   текстовых - {result[0][2]}\n,
-                   анимаций - {result[0][3]}\n,
-                   аудио - {result[0][4]}\n,
-                   документов - {result[0][5]}\n,
-                   фото - {result[0][6]}\n,
-                   стикеров - {result[0][7]}\n,
-                   видео - {result[0][8]}\n,
-                   видеокружков - {result[0][9]}\n,
-                   голосовых - {result[0][10]}\n,
-                   репутация - {result[0][11]}\n
-                   '''
-        pic = None
-        member = bot.get_user_profile_photos(int(user_id),1,1)
-        print() # получить фото пользователя
 
 def VoiceMsg(message:Message, bot:TeleBot):
     whosaid = ""

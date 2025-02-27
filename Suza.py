@@ -24,29 +24,38 @@ TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN, exception_handler=exception_handler)
 
 
-commands = ['/start', '/help', '/stat']
+commands = ['/start', '/help', '/stat', '/kick', 'mute']
 
 @bot.callback_query_handler(func=lambda callback: callback.data)
 def take_callback(callback):
-    if "newuser" in callback.data: # в колбеке еще слова с названием города
-        register_new_user(bot, callback)
+    if 'new_join_request' in callback.data and callback.from_user.id == int(callback.data.split()[1]):
+        allow_request_new_member(callback.from_user.id, callback.message.chat.id, bot)
+
     elif "married" in callback.data:
         functionsSuza.Wedding(callback, bot)
     else:
         functionsSuza.suza_menu(callback, bot)
 
-
+# загружаем сохраненное сообщение с нужными конфигурациями
+with open('mess.pickle', 'rb') as f:
+    saved_message = pickle.load(f)
 @bot.message_handler(func=lambda message: True,
                      content_types=['text', 'animation', 'audio',
                                     'document', 'photo', 'sticker',
-                                    'video', 'video_note', 'voice'])
+                                    'video', 'video_note', 'voice','new_chat_members'])
 def take_message(message: Message):
-    if message is not None:
-        # ведение статистики сообщений
+    if message is not None and (message.chat.type == 'supergroup' or
+            message.chat.type == 'private'):
         writing_statistics(message)
-    if message.text.lower() in commands:
+    if message.text is not None and message.text.lower() in commands:
         check_command(message, bot)
+    if message.content_type == 'new_chat_members':
+        join_request(message, bot)
 
+        # дописать команды mute etc.
+
+# вызываем нужную функцию и передаем загруженное сообщение
+take_message(saved_message)
 
 
 
@@ -125,7 +134,9 @@ def take_message(message: Message):
 #      if message.chat.type == "supergroup":
 #         join_request(message, bot)
 #
-# scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler()
+scheduler.add_job(kick_unverifed_user, 'interval', minutes=3, timezone=pytz.timezone('Europe/Moscow'), args=[bot])
+
 # scheduler.add_job(
 #     functionsSuza.BirthdaySVClub, 'cron', hour=8, minute=0,
 #     timezone=pytz.timezone('Europe/Moscow'), args=[bot])
@@ -146,6 +157,6 @@ def take_message(message: Message):
 #     functionsSuza.SaveStats, 'cron', day='1', month='1',
 #     hour=0, minute=0,
 #     timezone=pytz.timezone('Europe/Moscow'), args=['NewYear'])
-# scheduler.start()
+scheduler.start()
 
 bot.infinity_polling()
