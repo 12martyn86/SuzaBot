@@ -1,6 +1,4 @@
-import os.path
 import sqlite3
-from importlib.resources import contents
 from time import sleep
 import telebot
 from telebot import TeleBot, types, util
@@ -11,24 +9,40 @@ import speech_recognition as sr
 from moviepy.editor import VideoFileClip
 import pytz
 from datetime import datetime
-
 import admin_func
 from Suza_game import *
+from admin_func import mute_user, ban_user, kick_user
 
 
 # SV -1001721689921 train -1001874349025
 
-def GetOwner(message, bot):
-    admins = bot.get_chat_administrators(message.chat.id)
-    for admin in admins:
-        if admin.status == 'creator':
-            owner_id = admin.user.id
-            owner_username = admin.user.username
-            owner_lastname = admin.user.last_name
-            owner_firstname = admin.user.first_name
-            owner = [owner_id, owner_username, owner_lastname, owner_firstname]
-            bot.reply_to(message, f"Идентификатор владельца чата: {owner}")
-            break
+def check_command(message: Message, bot: TeleBot):
+    if message.text.lower() == "/start":
+        pass
+    elif message.text.lower() == "/help":
+        pass
+    elif message.text.lower() == "/stat":
+        if message.chat.type == 'supergroup' or  message.chat.type == 'private':
+            admin_func.check_statistic(message, bot)
+    elif '/kick' in message.text.lower().split():
+        kick_user(bot, message)
+    elif '/mute' in message.text.lower().split():
+        mute_user(bot, message)
+    elif '/ban' in message.text.lower().split():
+        ban_user(bot, message)
+
+
+# def GetOwner(message, bot):
+#     admins = bot.get_chat_administrators(message.chat.id)
+#     for admin in admins:
+#         if admin.status == 'creator':
+#             owner_id = admin.user.id
+#             owner_username = admin.user.username
+#             owner_lastname = admin.user.last_name
+#             owner_firstname = admin.user.first_name
+#             owner = [owner_id, owner_username, owner_lastname, owner_firstname]
+#             bot.reply_to(message, f"Идентификатор владельца чата: {owner}")
+#             break
 
 def Help(message, bot):
     if "/start" in message.text or message.text == "суза":
@@ -104,22 +118,9 @@ def Help(message, bot):
 
 
 
-def check_command(message: Message, bot: TeleBot):
-    if message.text.lower() == "/start":
-        pass
-    elif message.text.lower() == "/help":
-        pass
-    elif message.text.lower() == "/stat":
-        if message.chat.type == 'supergroup' or  message.chat.type == 'private':
-            admin_func.check_statistic(message, bot)
-    elif message.text.lower() == '/kick':
-        pass
-    elif message.text.lower() == '/mute':
-        pass
 
 
-def VoiceMsg(message:Message, bot:TeleBot):
-    whosaid = ""
+def VoiceMsg(message: Message, bot: TeleBot):
     # Получаем информацию о голосовом сообщении
     file_info = bot.get_file(message.voice.file_id)
     file_path = file_info.file_path
@@ -136,7 +137,7 @@ def VoiceMsg(message:Message, bot:TeleBot):
     audio.export('voice_message.wav', format='wav')
     RecognAudio("voice_message.wav", bot,message)
 
-def VideoMsg(message, bot):
+def VideoMsg(message: Message, bot: TeleBot):
     if message.content_type == "video":
         file_id = message.video.file_id
     else:
@@ -150,7 +151,7 @@ def VideoMsg(message, bot):
     audio.write_audiofile("audio.wav")
     RecognAudio("audio.wav", bot, message)
 
-def RecognAudio(audio,bot:TeleBot, message:Message):
+def RecognAudio(audio, bot: TeleBot, message: Message):
     # Распознаем речь в аудиофайле
     r = sr.Recognizer()
     with sr.AudioFile(audio) as source:
@@ -180,10 +181,10 @@ btnGoodness = types.InlineKeyboardButton(text="Полезности",
                                          callback_data="goodness")
 keybMain.add(btnManual, btnParts, btnTraders, btnMasters,
              btnEvents, btnGoodness)
-def Menu(message, bot):
+def Menu(message: Message, bot: TeleBot):
     bot.reply_to(message, "Выбирайте, что хотите. Помощь тут - /help",
                  reply_markup=keybMain)
-def suza_menu(callback, bot):
+def suza_menu(callback, bot: TeleBot):
     if 1 <= len(callback.data.split(" ")) < 2:
         conn = sqlite3.connect('SV.db')
         cursor = conn.cursor()
@@ -279,7 +280,7 @@ def Wedding(callback, bot):
             conn.close()
 
 
-def BirthdaySVClub(bot):
+def BirthdaySVClub(bot: TeleBot):
     current_date = datetime.now(
         pytz.timezone('Europe/Moscow')).strftime('%m-%d')
     conn = sqlite3.connect('SV.db')

@@ -1,4 +1,4 @@
-from telebot import types, util, TeleBot
+from telebot import TeleBot
 import telebot
 import sqlite3
 import datetime
@@ -251,3 +251,91 @@ def allow_request_new_member(user_id: int, chat_id: int, bot: TeleBot, ):
             file.write(line + '\n')
 
 
+def mute_user(bot: TeleBot, message: Message):
+    '''
+    Блокирует пользователю отправку каких-либо сообщений на указанное время.
+    Если время не указанно - блокирует на 5 минут.
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+    :param bot: Telebot
+    :return: None
+    '''
+    user_id = message.reply_to_message.from_user.id
+    id_who_call = message.from_user.id
+    admins = bot.get_chat_administrators(message.chat.id)
+    time = 300
+    admins_ids = []
+    for admin in admins:
+        admins_ids.append(admin.user.id)
+    if id_who_call in admins_ids and user_id not in admins_ids:
+        if len(message.text.lower().split()) >= 2:
+            time = 60 * int(message.text.lower().split()[1])
+        mute_until = datetime.datetime.now() + datetime.timedelta(seconds=time)
+        bot.restrict_chat_member(message.chat.id,
+                                 user_id,
+                                 can_send_messages=None,
+                                 can_send_media_messages=None,
+                                 can_send_polls=None,
+                                 can_send_other_messages=None,
+                                 can_change_info=None,
+                                 can_invite_users=None,
+                                 can_pin_messages=None,
+                                 until_date=mute_until
+                                 )
+        bot.reply_to(message, text=f'Пользователь будет молчать {time/60} минут')
+
+    elif id_who_call in admins_ids and user_id in admins_ids:
+        bot.reply_to(message, 'Пользователь которого вы пытаетесь ограничить - является админом чата.\n'
+                              'Команда не выполнена.\nРазберитесь между собою в лс.')
+    else:
+        bot.reply_to(message, 'Вы не являетесь админом чата. Команда не будет выполнена')
+
+
+def kick_user(bot: TeleBot, message: Message):
+    '''
+    Удаляет пользователя из группы. Пользователь сможет вернуться в группу.
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+    :param bot: Telebot
+    :return: None
+    '''
+    user_id = message.reply_to_message.from_user.id
+    id_who_call = message.from_user.id
+    admins = bot.get_chat_administrators(message.chat.id)
+    admins_ids = []
+    for admin in admins:
+        admins_ids.append(admin.user.id)
+    if id_who_call not in admins_ids:
+        bot.reply_to(message, 'Вы не админ чата. Команда не будет выполнена')
+    elif id_who_call in admins_ids and user_id in admins_ids:
+        bot.reply_to(message, 'Это админ группы.\nКоманда не выполнена.\nРазберитесь между собою в лс.')
+    elif id_who_call in admins_ids and user_id not in admins_ids:
+        bot.unban_chat_member(message.chat.id, user_id)
+        bot.reply_to(message, 'Пользователь покинул чат.')
+
+
+def ban_user(bot: TeleBot, message: Message):
+    '''
+    Удаляет пользователя из группы и болирует возможность вступить в группу.
+    Пользователь не сможет вернуться в группу.
+
+    :param message: Optional. New incoming message of any kind - text, photo, sticker, etc.
+    :type message: :class:`telebot.types.Message`
+    :param bot: Telebot
+    :return: None
+    '''
+    user_id = message.reply_to_message.from_user.id
+    id_who_call = message.from_user.id
+    admins = bot.get_chat_administrators(message.chat.id)
+    admins_ids = []
+    for admin in admins:
+        admins_ids.append(admin.user.id)
+    if id_who_call not in admins_ids:
+        bot.reply_to(message, 'Вы не админ чата. Команда не будет выполнена')
+    elif id_who_call in admins_ids and user_id in admins_ids:
+        bot.reply_to(message, 'Это админ группы.\nКоманда не выполнена.\nРазберитесь между собою в лс.')
+    elif id_who_call in admins_ids and user_id not in admins_ids:
+        bot.ban_chat_member(message.chat.id, user_id)
+        bot.reply_to(message, 'Пользователь покинул чат.')

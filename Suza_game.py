@@ -1,18 +1,10 @@
 import sqlite3
 import random
+from telebot import TeleBot
 from telebot.types import  Message
 
 
-def play_process(message:Message , bot):
-    game_words = [
-        "спасибо","погладить", "почесать спинку", "спс","мой авторитет",
-        "сяб", "пасибо", "пасяб", "спс", "поженимся", "чпок", "-", "+",
-        "+++", "благодарю", "спиздить","обчистить", "украсть", "обокрасть",
-        "пнуть", "обнять", "обнимашки", "скрасть", "отпиздить","опустить",
-        "пнуть", "поцеловать", "поцелуй", "чмок", "целовашки", "подарить",
-        "пожертвовать", "унизить", "зачмырить", "своровать","затискать",
-        "потискать"
-    ]
+def play_process(message: Message , bot: TeleBot, game_words: list):
     phrase = ""
     photo = None
     robber, victim = checking_users(message, bot)
@@ -62,7 +54,6 @@ def play_process(message:Message , bot):
     saving_res(robber, victim, phrase, message)
     return message, phrase, photo
 
-
 def checking_users(message, bot):
     robber = [
         message.from_user.id, message.from_user.username,
@@ -84,20 +75,20 @@ def checking_users(message, bot):
                     admin.user.id, admin.user.username,
                     admin.user.last_name, admin.user.first_name
                 ]
-    with sqlite3.connect("game.db") as con:
+    with sqlite3.connect("SV.db") as con:
         cursor = con.cursor()
-        cursor.execute(f"CREATE TABLE IF NOT EXISTS '{message.chat.id}' "
+        cursor.execute(f"CREATE TABLE IF NOT EXISTS 'text_game' "
                        f"(user_id INTEGER NOT NULL, username TEXT, "
                        f"lastname TEXT, firstname TEXT, "
                        f"stolen INTEGER NOT NULL DEFAULT 100, "
                        f"credibility INTEGER NOT NULL DEFAULT 10, "
                        f"status TEXT, "
                        f"married TEXT NOT NULL DEFAULT 'не в браке')")
-        cursor.execute(f"SELECT * FROM '{message.chat.id}' "
+        cursor.execute(f"SELECT * FROM 'text_game' "
                        f"WHERE user_id == {robber[0]}")
         result = cursor.fetchone()
         if result is None:
-            cursor.execute(f"INSERT INTO '{message.chat.id}' (user_id, "
+            cursor.execute(f"INSERT INTO 'text_game' (user_id, "
                            f"username, lastname, firstname, stolen, "
                            f"credibility, status, married) "
                            f"VALUES ({robber[0]}, '{robber[1]}', "
@@ -105,17 +96,17 @@ def checking_users(message, bot):
                            f"'первосезонник', 'не в браке')")
             con.commit()
         else:
-            cursor.execute(f"UPDATE '{message.chat.id}' "
+            cursor.execute(f"UPDATE 'text_game' "
                            f"SET username = '{robber[1]}', "
                            f"lastname = '{robber[2]}', "
                            f"firstname = '{robber[3]}' "
                            f"WHERE user_id = {robber[0]}")
             con.commit()
         cursor.execute(f"SELECT * "
-                       f"FROM '{message.chat.id}' WHERE user_id = {victim[0]}")
+                       f"FROM 'text_game' WHERE user_id = {victim[0]}")
         result = cursor.fetchone()
         if result is None:
-            cursor.execute(f"INSERT INTO '{message.chat.id}' (user_id, "
+            cursor.execute(f"INSERT INTO 'text_game' (user_id, "
                            f"username, lastname, firstname, stolen, "
                            f"credibility, status, married) "
                            f"VALUES ({victim[0]}, '{victim[1]}', "
@@ -123,17 +114,17 @@ def checking_users(message, bot):
                            f"'первосезонник', 'не в браке')")
             con.commit()
         else:
-            cursor.execute(f"UPDATE '{message.chat.id}' "
+            cursor.execute(f"UPDATE 'text_game' "
                            f"SET username = '{victim[1]}', "
                            f"lastname = '{victim[2]}', "
                            f"firstname = '{victim[3]}' "
                            f"WHERE user_id = {victim[0]}")
             con.commit()
         robber = list(cursor.execute(
-            f"SELECT * FROM '{message.chat.id}' "
+            f"SELECT * FROM 'text_game' "
             f"WHERE user_id == {robber[0]}").fetchone())
         victim = list(cursor.execute(
-            f"SELECT * FROM '{message.chat.id}' "
+            f"SELECT * FROM 'text_game' "
             f"WHERE user_id == {victim[0]}").fetchone())
     return robber, victim
 
@@ -372,9 +363,9 @@ def wedding(robber, victim):
     pass
 
 def asking_status(robber, phrase, message):
-    with sqlite3.connect("game.db") as con:
+    with sqlite3.connect("SV.db") as con:
         cursor = con.cursor()
-        cursor.execute(f"SELECT * FROM '{message.chat.id}' "
+        cursor.execute(f"SELECT * FROM 'text_game' "
                        f"WHERE user_id = {robber[0]}")
         robber = cursor.fetchone()
         phrase = (f"{robber[0]}/{robber[1]}/{robber[2]} {robber[3]}\n"
@@ -385,9 +376,9 @@ def asking_status(robber, phrase, message):
 
 
 def saving_res(robber, victim, phrase, message):
-    with sqlite3.connect("game.db") as con:
+    with sqlite3.connect("SV.db") as con:
         cursor = con.cursor()
-        cursor.execute(f"UPDATE '{message.chat.id}' "
+        cursor.execute(f"UPDATE 'text_game' "
                        f"SET username = '{robber[1]}', "
                        f"lastname = '{robber[2]}', firstname = '{robber[3]}', "
                        f"stolen = {robber[4]}, credibility = {robber[5]}, "
@@ -395,7 +386,7 @@ def saving_res(robber, victim, phrase, message):
                        f"WHERE user_id = {robber[0]}")
         con.commit()
         if robber[0] != victim[0]:
-            cursor.execute(f"UPDATE '{message.chat.id}' "
+            cursor.execute(f"UPDATE 'text_game' "
                            f"SET username = '{victim[1]}', "
                            f"lastname = '{victim[2]}', "
                            f"firstname = '{victim[3]}', stolen = {victim[4]}, "

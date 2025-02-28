@@ -1,3 +1,4 @@
+import pickle
 from apscheduler.schedulers.background import BackgroundScheduler
 import telebot
 import functionsSuza
@@ -9,7 +10,9 @@ from funy_func import *
 from parts_article import  *
 from telebot import *
 from telebot import types
-import traceback
+
+from test import save_testmessage
+
 
 # SV -1001721689921     Train -1001874349025 памятка для тестирования
 class ExceptionHandler:
@@ -24,7 +27,17 @@ TOKEN = os.getenv("TOKEN")
 bot = telebot.TeleBot(TOKEN, exception_handler=exception_handler)
 
 
-commands = ['/start', '/help', '/stat', '/kick', 'mute']
+commands = ['/start', '/help', '/stat', '/kick', '/ban', '/mute']
+
+game_words = [
+        "спасибо","погладить", "почесать спинку", "спс","мой авторитет",
+        "сяб", "пасибо", "пасяб", "спс", "поженимся", "чпок", "-", "+",
+        "+++", "благодарю", "спиздить","обчистить", "украсть", "обокрасть",
+        "пнуть", "обнять", "обнимашки", "скрасть", "отпиздить","опустить",
+        "пнуть", "поцеловать", "поцелуй", "чмок", "целовашки", "подарить",
+        "пожертвовать", "унизить", "зачмырить", "своровать","затискать",
+        "потискать"
+    ]
 
 @bot.callback_query_handler(func=lambda callback: callback.data)
 def take_callback(callback):
@@ -36,60 +49,38 @@ def take_callback(callback):
     else:
         functionsSuza.suza_menu(callback, bot)
 
-# загружаем сохраненное сообщение с нужными конфигурациями
-with open('mess.pickle', 'rb') as f:
-    saved_message = pickle.load(f)
+# загружаем сохраненное сообщение с нужными конфигурациями для тестов
+# with open('mess.pickle', 'rb') as f:
+#     saved_message = pickle.load(f)
 @bot.message_handler(func=lambda message: True,
                      content_types=['text', 'animation', 'audio',
                                     'document', 'photo', 'sticker',
                                     'video', 'video_note', 'voice','new_chat_members'])
 def take_message(message: Message):
+    save_testmessage(message) #сохранение сообщения для тестов
     if message is not None and (message.chat.type == 'supergroup' or
             message.chat.type == 'private'):
         writing_statistics(message)
-    if message.text is not None and message.text.lower() in commands:
-        check_command(message, bot)
-    if message.content_type == 'new_chat_members':
+    if message.text is not None:
+        for command in commands:
+            if command in message.text.lower():
+                check_command(message, bot)
+        for word in game_words:
+            if word in message.text.lower().split():
+                play_process(message, bot, game_words)
+    if message.content_type == 'new_chat_members' and message.chat.type == 'supergroup':
         join_request(message, bot)
+    if message.content_type == 'voice' or message.content_type == 'vidoe_note':
+        if message.content_type == 'voice':
+            VoiceMsg(message, bot)
+        elif message.content_type == 'video_note':
+            VideoMsg(message, bot)
 
-        # дописать команды mute etc.
 
-# вызываем нужную функцию и передаем загруженное сообщение
-take_message(saved_message)
-
+# вызываем нужную функцию и передаем загруженное сообщение для тестирования
+#take_message(saved_message)
 
 
-#
-#
-#
-#     if message.chat.type == "supergroup":
-#         functionsSuza.Statistics(message)
-#     elif message.chat.type == "private":
-#         with sqlite3.connect("users.db") as con:
-#             cursor = con.cursor()
-#             cursor.execute(f"SELECT status FROM {message.chat.title} "
-#                            f"where user_id ==  {message.from_user.id}")
-#             result = cursor.fetchone()
-#             if result is None or result[0] != "Done":
-#                 if result is None:
-#                     bot.reply_to(
-#                         message,
-#                         "Здравствуйте, не нашла вас "
-#                         "ни в одной из моих групп. "
-#                         "Видимо мы еще не знакомы? Тогда пожалуй вам "
-#                         "стоит начать с /help")
-#                         # проверить хелп сообщение
-#                 elif result[0] != "Done":
-#                     keyb_new_user = types.InlineKeyboardMarkup(row_width=3)
-#                     btn_new_user = types.InlineKeyboardButton(
-#                         text="Начать заполнение анкеты.",
-#                         callback_data=f"newuser")
-#                     keyb_new_user.add(btn_new_user)
-#                     bot.reply_to(
-#                         message,
-#                         "Приветствую. У вас не заполнена анкета "
-#                         "для групповых чатов. "
-#                         "Давайте ее заполним", reply_markup =keyb_new_user)
 #     if message.text is not None:
 #         message.text = message.text.lower()
 #         if ("/help" in message.text
@@ -99,10 +90,6 @@ take_message(saved_message)
 #                 or "/holiday" in message.text
 #                 or "/game" in message.text):
 #             functionsSuza.Help(message, bot)
-#         elif (message.text == "!stat"
-#               or message.text == "/!stat"
-#               or "/stat" in message.text):
-#             functionsSuza.StatConversations(message, bot)
 #         elif "!праздник" in message.text:
 #             hollidays(message,bot)
 #         elif "/parts" in message.text:
@@ -110,53 +97,14 @@ take_message(saved_message)
 #             bot.reply_to(
 #                 message,
 #                 text)
-#     if message.content_type == 'voice':
-#         functionsSuza.VoiceMsg(message, bot)
-#     if message.content_type == 'video_note':
-#         functionsSuza.VideoMsg(message, bot)
 #     if message.text is not None and "/menu" in message.text:
 #         functionsSuza.Menu(message, bot)
 #
-#     game_words = [
-#         "спасибо", "погладить", "почесать спинку", "спс",
-#         "мой авторитет", "сяб", "пасибо", "пасяб", "поженимся",
-#         "чпок", "-", "+", "+++", "спиздить", "обчистить",
-#         "украсть", "обокрасть", "пнуть", "обнять", "обнимашки",
-#         "скрасть", "отпиздить", "опустить", "пнуть", "поцеловать",
-#         "поцелуй", "чмок", "целовашки", "подарить", "пожертвовать",
-#         "унизить", "зачмырить", "своровать", "затискать", "потискать"]
-#     if message.text in game_words and message.text is not None:
-#         play_process(message, bot)
-#
-#
-# @bot.message_handler(content_types=['new_chat_members'])
-# def admin(message):
-#      if message.chat.type == "supergroup":
-#         join_request(message, bot)
-#
 scheduler = BackgroundScheduler()
 scheduler.add_job(kick_unverifed_user, 'interval', minutes=3, timezone=pytz.timezone('Europe/Moscow'), args=[bot])
-
 # scheduler.add_job(
 #     functionsSuza.BirthdaySVClub, 'cron', hour=8, minute=0,
 #     timezone=pytz.timezone('Europe/Moscow'), args=[bot])
-# scheduler.add_job(
-#     kick_new_user, 'cron', hour=8, minute=0,
-#     timezone=pytz.timezone('Europe/Moscow'), args=[bot])
-# scheduler.add_job(
-#     functionsSuza.SaveStats, 'cron', hour=0, minute=0,
-#     timezone=pytz.timezone('Europe/Moscow'), args=['closeday'])
-# scheduler.add_job(
-#     functionsSuza.SaveStats, 'cron', day_of_week='mon',
-#     hour=0, minute=0, timezone=pytz.timezone('Europe/Moscow'),
-#     args=['closeweek'])
-# scheduler.add_job(
-#     functionsSuza.SaveStats, 'cron', day='1', hour=0, minute=0,
-#     timezone=pytz.timezone('Europe/Moscow'), args=['closemonth'])
-# scheduler.add_job(
-#     functionsSuza.SaveStats, 'cron', day='1', month='1',
-#     hour=0, minute=0,
-#     timezone=pytz.timezone('Europe/Moscow'), args=['NewYear'])
 scheduler.start()
 
 bot.infinity_polling()
